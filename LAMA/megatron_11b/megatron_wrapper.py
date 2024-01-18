@@ -3,7 +3,7 @@ from .models import TransformerLanguageModelWrapper
 from os.path import join
 from tqdm import tqdm
 
-import _pickle
+import pickle
 import torch
 import os
 import sys
@@ -24,14 +24,14 @@ def load_megatron_lm(args):
     megatron_path = join(args.checkpoint_dir, 'Megatron_11b', 'megatron_11b')
     # init args for task initialization
     if os.path.exists(join(megatron_path, 'task.pkl')):
-        task = _pickle.load(open(join(megatron_path, 'task.pkl'), 'rb'))
+        task = pickle.load(open(join(megatron_path, 'task.pkl'), 'rb'))
     else:
         sys.argv.append(megatron_path)
         task_args = get_task_args()
         distributed_utils.infer_init_method(task_args)
         task_args.distributed_rank = None
         task = tasks.setup_task(task_args)
-        _pickle.dump(task, open(join(megatron_path, 'task.pkl'), 'wb'))
+        pickle.dump(task, open(join(megatron_path, 'task.pkl'), 'wb'))
 
     # load model partitions
     if os.path.exists(join(megatron_path, 'model.pt')):
