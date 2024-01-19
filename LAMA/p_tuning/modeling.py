@@ -3,6 +3,7 @@ from torch.nn.utils.rnn import pad_sequence
 from os.path import join
 
 import re
+import os
 
 from transformers import AutoTokenizer
 
@@ -25,6 +26,7 @@ class PTuneForLAMA(torch.nn.Module):
 
         # load tokenizer
         tokenizer_src = 'roberta-large' if 'megatron' in self.args.model_name else self.args.model_name
+        tokenizer_src = os.path.join(os.getenv('my_data_dir'), "pretrained", tokenizer_src) # 本地
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_src, use_fast=False)
 
         # load pre-trained model
