@@ -1,24 +1,39 @@
-import json
 import os
-import torch
-import argparse
-import numpy as np
+import sys
+sys.path.append(os.path.realpath(os.path.join(os.path.realpath(__file__), "..", "..")))
 
-from torch.utils.data import DataLoader
-from datetime import datetime
-from tqdm import tqdm
-from transformers import AutoTokenizer
-
-from os.path import join, abspath, dirname
-
-from LAMA.data_utils.dataset import load_file, LAMADataset
-from LAMA.data_utils.vocab import init_vocab
 from LAMA.p_tuning.modeling import PTuneForLAMA
+from LAMA.data_utils.vocab import init_vocab
+from LAMA.data_utils.dataset import load_file, LAMADataset
+from os.path import join, abspath, dirname
+from transformers import AutoTokenizer
+from tqdm import tqdm
+from datetime import datetime
+from torch.utils.data import DataLoader
+import numpy as np
+import argparse
+import torch
 
-SUPPORT_MODELS = ['bert-base-cased', 'bert-large-cased',
-                  'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl',
-                  'roberta-base', 'roberta-large',
+
+SUPPORT_MODELS = ['bert-base-cased',
+                  'bert-large-cased',
+                  'gpt2',
+                  'gpt2-medium',
+                  'gpt2-large',
+                  'gpt2-xl',
+                  'roberta-base',
+                  'roberta-large',
                   'megatron_11b']
+
+SUPPORT_MODELS_LOCAL = ['C:/data/pretrained/bert-base-cased',
+                        'C:/data/pretrained/bert-large-cased',
+                        'C:/data/pretrained/gpt2',
+                        'C:/data/pretrained/gpt2-medium',
+                        'C:/data/pretrained/gpt2-large',
+                        'C:/data/pretrained/gpt2-xl',
+                        'C:/data/pretrained/roberta-base',
+                        'C:/data/pretrained/roberta-large',
+                        'C:/data/pretrained/megatron_11b']
 
 
 def set_seed(args):
@@ -82,11 +97,12 @@ class Trainer(object):
         self.device = 'cuda:0' if self.args.model_name != 't5-11b' else 'cuda:{}'.format(self.args.t5_shard * 4)
 
         if self.args.use_original_template and (not self.args.use_lm_finetune) and (not self.args.only_evaluate):
-            raise RuntimeError("""If use args.use_original_template is True, 
-            either args.use_lm_finetune or args.only_evaluate should be True.""")
+            raise RuntimeError(
+                """If use args.use_original_template is True, either args.use_lm_finetune or args.only_evaluate should be True.""")
 
         # load tokenizer
         tokenizer_src = 'roberta-large' if 'megatron' in self.args.model_name else self.args.model_name
+        tokenizer_src = os.path.join(os.getenv('my_data_dir'), "pretrained", tokenizer_src)
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_src, use_fast=False)
         init_vocab(args)
 
@@ -101,6 +117,8 @@ class Trainer(object):
         self.train_set = LAMADataset('train', self.train_data, self.tokenizer, self.args)
         self.dev_set = LAMADataset('dev', self.dev_data, self.tokenizer, self.args)
         os.makedirs(self.get_save_path(), exist_ok=True)
+
+        print("结果目录:", os.path.normpath(os.path.realpath(self.get_save_path())))
 
         self.train_loader = DataLoader(self.train_set, batch_size=8, shuffle=True, drop_last=True)
         self.dev_loader = DataLoader(self.dev_set, batch_size=8)
@@ -129,14 +147,13 @@ class Trainer(object):
                 if False and self.args.extend_data:
                     _loss, _hit1 = self.model.test_extend_data(x_hs, x_ts)
                 elif evaluate_type == 'Test':
-                    _loss, _hit1, top10 = self.model(x_hs, x_ts, return_candidates=True)
+                    _loss, _hit1, top10 = self.model.forward(x_hs, x_ts, return_candidates=True)
                 else:
-                    _loss, _hit1 = self.model(x_hs, x_ts)
+                    _loss, _hit1 = self.model.forward(x_hs, x_ts)
                 hit1 += _hit1
                 loss += _loss.item()
             hit1 /= len(dataset)
-            print("{} {} Epoch {} Loss: {} Hit@1:".format(self.args.relation_id, evaluate_type, epoch_idx,
-                                                          loss / len(dataset)), hit1)
+            print("{} {} Epoch {} Loss: {} Hit@1:".format(self.args.relation_id, evaluate_type, epoch_idx, loss / len(dataset)), hit1)
         return loss, hit1
 
     def get_task_name(self):
@@ -149,12 +166,10 @@ class Trainer(object):
         return "_".join(names)
 
     def get_save_path(self):
-        return join(self.args.out_dir, 'prompt_model', self.args.model_name, 'search', self.get_task_name(),
-                    self.args.relation_id)
+        return join(self.args.out_dir, 'prompt_model', self.args.model_name, 'search', self.get_task_name(), self.args.relation_id)
 
     def get_checkpoint(self, epoch_idx, dev_hit1, test_hit1):
-        ckpt_name = "epoch_{}_dev_{}_test_{}.ckpt".format(epoch_idx, round(dev_hit1 * 100, 4),
-                                                          round(test_hit1 * 100, 4))
+        ckpt_name = "epoch_{}_dev_{}_test_{}.ckpt".format(epoch_idx, round(dev_hit1 * 100, 4), round(test_hit1 * 100, 4))
         return {'embedding': self.model.prompt_encoder.state_dict(),
                 'dev_hit@1': dev_hit1,
                 'test_hit@1': test_hit1,
@@ -177,8 +192,11 @@ class Trainer(object):
         params = [{'params': self.model.prompt_encoder.parameters()}]
         if self.args.use_lm_finetune:
             params.append({'params': self.model.model.parameters(), 'lr': 5e-6})
-        optimizer = torch.optim.Adam(params, lr=self.args.lr, weight_decay=self.args.weight_decay)
-        my_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.args.decay_rate)
+        optimizer = torch.optim.Adam(params,
+                                     lr=self.args.lr,
+                                     weight_decay=self.args.weight_decay)
+        my_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer,
+                                                                 gamma=self.args.decay_rate)
 
         for epoch_idx in range(100):
             # check early stopping
@@ -205,7 +223,7 @@ class Trainer(object):
             tot_loss = 0
             for batch_idx, batch in tqdm(enumerate(self.train_loader)):
                 self.model.train()
-                loss, batch_hit1 = self.model(batch[0], batch[1])
+                loss, batch_hit1 = self.model.forward(batch[0], batch[1])
                 hit1 += batch_hit1
                 tot_loss += loss.item()
                 num_of_samples += len(batch[0])
