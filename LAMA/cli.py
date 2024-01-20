@@ -94,8 +94,8 @@ def construct_generation_args():
 class Trainer(object):
     def __init__(self, args):
         self.args = args
-        self.device = 'cuda:0' if self.args.model_name != 't5-11b' else 'cuda:{}'.format(self.args.t5_shard * 4)
-
+        # self.device = 'cuda:0' if self.args.model_name != 't5-11b' else 'cuda:{}'.format(self.args.t5_shard * 4)
+        self.device = args.device
         if self.args.use_original_template and (not self.args.use_lm_finetune) and (not self.args.only_evaluate):
             raise RuntimeError(
                 """If use args.use_original_template is True, either args.use_lm_finetune or args.only_evaluate should be True.""")

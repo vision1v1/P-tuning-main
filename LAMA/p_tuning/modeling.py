@@ -21,12 +21,11 @@ class PTuneForLAMA(torch.nn.Module):
         self.device = device
 
         # load relation templates
-        self.relation_templates = dict(
-            (d['relation'], d['template']) for d in load_file(join(self.args.data_dir, 'relations.jsonl')))
+        self.relation_templates = dict((d['relation'], d['template']) for d in load_file(join(self.args.data_dir, 'relations.jsonl')))
 
         # load tokenizer
         tokenizer_src = 'roberta-large' if 'megatron' in self.args.model_name else self.args.model_name
-        tokenizer_src = os.path.join(os.getenv('my_data_dir'), "pretrained", tokenizer_src) # 本地
+        tokenizer_src = os.path.join(os.getenv('my_data_dir'), "pretrained", tokenizer_src)  # 本地
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_src, use_fast=False)
 
         # load pre-trained model
@@ -80,8 +79,7 @@ class PTuneForLAMA(torch.nn.Module):
                 query = re.sub(r'\[Y\].*', '', self.relation_templates[self.args.relation_id].replace('[X]', x_h))
                 return self.tokenizer(' ' + query)['input_ids']
             else:
-                query = self.relation_templates[self.args.relation_id].replace('[X]', x_h).replace('[Y]',
-                                                                                                   self.tokenizer.mask_token)
+                query = self.relation_templates[self.args.relation_id].replace('[X]', x_h).replace('[Y]', self.tokenizer.mask_token)
                 return self.tokenizer(' ' + query)['input_ids']
         # For P-tuning
         if 'gpt' not in self.args.model_name and 'megatron' not in self.args.model_name:
@@ -91,18 +89,14 @@ class PTuneForLAMA(torch.nn.Module):
                     + [self.tokenizer.mask_token_id]  # head entity
                     + prompt_tokens * self.template[1]
                     + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # [MASK] (tail entity)
-                    + (prompt_tokens * self.template[2] if self.template[
-                                                               2] > 0 else self.tokenizer.convert_tokens_to_ids(['.']))
-                    + [self.tokenizer.sep_token_id]
-                    ]
+                    + (prompt_tokens * self.template[2] if self.template[2] > 0 else self.tokenizer.convert_tokens_to_ids(['.']))
+                    + [self.tokenizer.sep_token_id]]
         elif 'gpt' in self.args.model_name or 'megatron' in self.args.model_name:
             # GPT-style models
             return [prompt_tokens * self.template[0]
                     + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # head entity
                     + prompt_tokens * self.template[1]
-                    + (self.tokenizer.convert_tokens_to_ids(
-                self.tokenizer.tokenize(' ' + x_t)) if x_t is not None else [])
-                    ]
+                    + (self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_t)) if x_t is not None else [])]
         else:
             raise NotImplementedError("The query template for {} has not been defined.".format(self.args.model_name))
 
@@ -116,21 +110,19 @@ class PTuneForLAMA(torch.nn.Module):
         queries = pad_sequence(queries, True, padding_value=self.pad_token_id).long().to(self.device)
 
         # construct label ids
-        label_ids = torch.LongTensor(self.tokenizer.convert_tokens_to_ids(x_ts)).reshape(
-            (bz, -1)).to(self.device)
+        label_ids = torch.LongTensor(self.tokenizer.convert_tokens_to_ids(x_ts)).reshape((bz, -1)).to(self.device)
         attention_mask = queries != self.pad_token_id
 
         # get embedded input
         inputs_embeds = self.embed_input(queries)
 
         def bert_out():
-            label_mask = (queries == self.tokenizer.mask_token_id).nonzero().reshape(bz, -1)[:, 1].unsqueeze(
-                1).to(self.device)  # bz * 1
+            label_mask = (queries == self.tokenizer.mask_token_id).nonzero().reshape(bz, -1)[:, 1].unsqueeze(1).to(self.device)  # bz * 1
             labels = torch.empty_like(queries).fill_(-100).long().to(self.device)  # bz * seq_len
             labels = labels.scatter_(1, label_mask, label_ids)
-            output = self.model(inputs_embeds=inputs_embeds.to(self.device),
-                                attention_mask=attention_mask.to(self.device).bool(),
-                                labels=labels.to(self.device))
+            output = self.model.forward(inputs_embeds=inputs_embeds.to(self.device),
+                                        attention_mask=attention_mask.to(self.device).bool(),
+                                        labels=labels.to(self.device))
             loss, logits = output.loss, output.logits
 
             pred_ids = torch.argsort(logits, dim=2, descending=True)
@@ -153,9 +145,9 @@ class PTuneForLAMA(torch.nn.Module):
             label_mask = (attention_mask.long().sum(dim=1) - 1).unsqueeze(1).to(self.device)
             labels = labels.scatter_(1, label_mask, label_ids)
 
-            output = self.model(inputs_embeds=inputs_embeds.to(self.device).half(),
-                                attention_mask=attention_mask.to(self.device).half(),
-                                labels=labels.to(self.device))
+            output = self.model.forward(inputs_embeds=inputs_embeds.to(self.device).half(),
+                                        attention_mask=attention_mask.to(self.device).half(),
+                                        labels=labels.to(self.device))
             loss, logits = output.loss, output.logits
 
             pred_ids = torch.argsort(logits, dim=2, descending=True)

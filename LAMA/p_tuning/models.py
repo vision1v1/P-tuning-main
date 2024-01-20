@@ -12,7 +12,7 @@ def create_model(args):
     if not args.use_lm_finetune:
         if 'megatron' in args.model_name:
             raise NotImplementedError("MegatronLM 11B is not for fine-tuning.")
-        model = model.half()
+        # model = model.half() # 在cpu上调试不支持
     return model
 
 
