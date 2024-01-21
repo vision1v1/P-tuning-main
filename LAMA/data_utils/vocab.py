@@ -35,7 +35,7 @@ def get_vocab(model_name, strategy):
 
 
 def get_vocab_by_strategy(args, tokenizer):
-    if args.vocab_strategy == 'original':
+    if args.vocab_strategy == 'original': # 原始词典
         return tokenizer.get_vocab()
     else:
         return get_vocab(args.model_name, args.vocab_strategy)

@@ -34,7 +34,7 @@ class PTuneForLAMA(torch.nn.Module):
         self.model = create_model(self.args)
         self.model = self.model.to(self.device)
         for param in self.model.parameters():
-            param.requires_grad = self.args.use_lm_finetune
+            param.requires_grad = self.args.use_lm_finetune # 模型都被冻住
         self.embeddings = get_embedding_layer(self.args, self.model)
 
         # set allowed vocab set

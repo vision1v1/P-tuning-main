@@ -71,10 +71,14 @@ def construct_generation_args():
     parser.add_argument("--lstm_dropout", type=float, default=0.0)
 
     # directories
-    parser.add_argument("--data_dir", type=str, default=join(abspath(dirname(__file__)), '../data/LAMA'))
-    parser.add_argument("--out_dir", type=str, default=join(abspath(dirname(__file__)), '../out/LAMA'))
+    default_data_dir = os.path.normpath(join(abspath(dirname(__file__)), "..", "data", "LAMA"))
+    parser.add_argument("--data_dir", type=str, default=default_data_dir)
+    default_out_dir = os.path.normpath(join(abspath(dirname(__file__)), "..", "out", "LAMA"))
+    parser.add_argument("--out_dir", type=str, default=default_out_dir)
+
     # MegatronLM 11B
-    parser.add_argument("--checkpoint_dir", type=str, default=join(abspath(dirname(__file__)), '../checkpoints'))
+    default_checkpoint_dir =  os.path.normpath(join(abspath(dirname(__file__)), "..", "checkpoints"))
+    parser.add_argument("--checkpoint_dir", type=str, default=default_checkpoint_dir)
 
     args = parser.parse_args()
 
@@ -109,13 +113,17 @@ class Trainer(object):
         # load datasets and dataloaders
         self.relation, self.data_path_pre, self.data_path_post = self.get_TREx_parameters()
 
-        self.train_data = load_file(join(self.args.data_dir, self.data_path_pre + 'train' + self.data_path_post))
-        self.dev_data = load_file(join(self.args.data_dir, self.data_path_pre + 'dev' + self.data_path_post))
-        self.test_data = load_file(join(self.args.data_dir, self.data_path_pre + 'test' + self.data_path_post))
+        load_data_dir = os.path.normpath(join(self.args.data_dir, self.data_path_pre))
+        print("加载的数据目录位置：", load_data_dir)
 
-        self.test_set = LAMADataset('test', self.test_data, self.tokenizer, self.args)
+        self.train_data = load_file(join(load_data_dir, 'train' + self.data_path_post))
+        self.dev_data = load_file(join(load_data_dir, 'dev' + self.data_path_post))
+        self.test_data = load_file(join(load_data_dir, 'test' + self.data_path_post))
+
         self.train_set = LAMADataset('train', self.train_data, self.tokenizer, self.args)
         self.dev_set = LAMADataset('dev', self.dev_data, self.tokenizer, self.args)
+        self.test_set = LAMADataset('test', self.test_data, self.tokenizer, self.args)
+
         os.makedirs(self.get_save_path(), exist_ok=True)
 
         print("结果目录:", os.path.normpath(os.path.realpath(self.get_save_path())))
@@ -199,24 +207,24 @@ class Trainer(object):
                                                                  gamma=self.args.decay_rate)
 
         for epoch_idx in range(100):
-            # check early stopping
-            if epoch_idx > -1:
-                dev_loss, dev_hit1 = self.evaluate(epoch_idx, 'Dev')
-                if epoch_idx == 0:
-                    test_loss, test_hit1 = self.evaluate(epoch_idx, 'Test')
-                if epoch_idx > 0 and (dev_hit1 >= best_dev) or self.args.only_evaluate:
-                    test_loss, test_hit1 = self.evaluate(epoch_idx, 'Test')
-                    best_ckpt = self.get_checkpoint(epoch_idx, dev_hit1, test_hit1)
-                    early_stop = 0
-                    best_dev = dev_hit1
-                else:
-                    early_stop += 1
-                    if early_stop >= self.args.early_stop:
-                        self.save(best_ckpt)
-                        print("{} Early stopping at epoch {}.".format(self.args.relation_id, epoch_idx))
-                        return best_ckpt
-            if self.args.only_evaluate:
-                break
+            # check early stopping # 这里暂时注释掉。方便调试
+            # if epoch_idx > -1:
+            #     dev_loss, dev_hit1 = self.evaluate(epoch_idx, 'Dev')
+            #     if epoch_idx == 0:
+            #         test_loss, test_hit1 = self.evaluate(epoch_idx, 'Test')
+            #     if epoch_idx > 0 and (dev_hit1 >= best_dev) or self.args.only_evaluate:
+            #         test_loss, test_hit1 = self.evaluate(epoch_idx, 'Test')
+            #         best_ckpt = self.get_checkpoint(epoch_idx, dev_hit1, test_hit1)
+            #         early_stop = 0
+            #         best_dev = dev_hit1
+            #     else:
+            #         early_stop += 1
+            #         if early_stop >= self.args.early_stop:
+            #             self.save(best_ckpt)
+            #             print("{} Early stopping at epoch {}.".format(self.args.relation_id, epoch_idx))
+            #             return best_ckpt
+            # if self.args.only_evaluate:
+            #     break
 
             # run training
             hit1, num_of_samples = 0, 0
