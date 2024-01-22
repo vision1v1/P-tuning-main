@@ -32,7 +32,7 @@ def get_embedding_layer(args, model):
     if 'roberta' in args.model_name:
         embeddings = model.roberta.get_input_embeddings()
     elif 'bert' in args.model_name:
-        embeddings = model.bert.get_input_embeddings()
+        embeddings = model.bert.get_input_embeddings() # bert 中的 word_embedding
     elif 'gpt' in args.model_name:
         embeddings = model.base_model.get_input_embeddings()
     elif 'megatron' in args.model_name:

@@ -111,14 +111,15 @@ class Trainer(object):
         init_vocab(args)
 
         # load datasets and dataloaders
-        self.relation, self.data_path_pre, self.data_path_post = self.get_TREx_parameters()
+        # self.relation, self.data_path_pre, self.data_path_post = self.get_TREx_parameters()
 
-        load_data_dir = os.path.normpath(join(self.args.data_dir, self.data_path_pre))
+        # load_data_dir = os.path.normpath(join(self.args.data_dir, self.data_path_pre))
+        load_data_dir = os.path.normpath(os.path.join(args.data_dir, f"fact-retrieval/original/{args.relation_id}/"))
         print("load_data_dir :", load_data_dir)
 
-        self.train_data = load_file(join(load_data_dir, 'train' + self.data_path_post))
-        self.dev_data = load_file(join(load_data_dir, 'dev' + self.data_path_post))
-        self.test_data = load_file(join(load_data_dir, 'test' + self.data_path_post))
+        self.train_data = load_file(join(load_data_dir, 'train.jsonl'))
+        self.dev_data = load_file(join(load_data_dir, 'dev.jsonl'))
+        self.test_data = load_file(join(load_data_dir, 'test.jsonl'))
 
         self.train_set = LAMADataset('train', self.train_data, self.tokenizer, self.args)
         self.dev_set = LAMADataset('dev', self.dev_data, self.tokenizer, self.args)
