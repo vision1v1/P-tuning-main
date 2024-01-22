@@ -21,20 +21,23 @@ class PTuneForLAMA(torch.nn.Module):
         self.device = device
 
         # load relation templates
-        self.relation_templates = dict((d['relation'], d['template']) for d in load_file(join(self.args.data_dir, 'relations.jsonl')))
+        relations_file_path = join(self.args.data_dir, 'relations.jsonl')
+        print("relations_file_path in PTuneForLAMA :", relations_file_path)
+        self.relation_templates = {d['relation']: d['template'] for d in load_file(relations_file_path)}
 
         # load tokenizer
         tokenizer_src = 'roberta-large' if 'megatron' in self.args.model_name else self.args.model_name
         tokenizer_src = os.path.join(os.getenv('my_data_dir'), "pretrained", tokenizer_src)  # 本地
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_src, use_fast=False)
+        print("tokenizer_src :", tokenizer_src)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_src, use_fast=False) # TODO tokenizer 应该通过初始化函数 注入进来的。
 
         # load pre-trained model
         if 'megatron' in self.args.model_name and self.args.use_lm_finetune:
             raise RuntimeError("Can not apply args.use_lm_finetune=True on MegatronLM 11B.")
-        self.model = create_model(self.args)
+        self.model = create_model(self.args) # TODO 这个也应该从初始化注入进来。
         self.model = self.model.to(self.device)
         for param in self.model.parameters():
-            param.requires_grad = self.args.use_lm_finetune # 模型都被冻住
+            param.requires_grad = self.args.use_lm_finetune  # 模型都被冻住
         self.embeddings = get_embedding_layer(self.args, self.model)
 
         # set allowed vocab set

@@ -114,7 +114,7 @@ class Trainer(object):
         self.relation, self.data_path_pre, self.data_path_post = self.get_TREx_parameters()
 
         load_data_dir = os.path.normpath(join(self.args.data_dir, self.data_path_pre))
-        print("加载的数据目录位置：", load_data_dir)
+        print("load_data_dir :", load_data_dir)
 
         self.train_data = load_file(join(load_data_dir, 'train' + self.data_path_post))
         self.dev_data = load_file(join(load_data_dir, 'dev' + self.data_path_post))
@@ -126,18 +126,21 @@ class Trainer(object):
 
         os.makedirs(self.get_save_path(), exist_ok=True)
 
-        print("结果目录:", os.path.normpath(os.path.realpath(self.get_save_path())))
+        print("output_dir :", os.path.normpath(os.path.realpath(self.get_save_path())))
 
-        self.train_loader = DataLoader(self.train_set, batch_size=8, shuffle=True, drop_last=True)
+        self.train_loader = DataLoader(self.train_set, batch_size=8, shuffle=False, drop_last=True) # shuffle=False 方便调试
         self.dev_loader = DataLoader(self.dev_set, batch_size=8)
         self.test_loader = DataLoader(self.test_set, batch_size=8)
 
         self.model = PTuneForLAMA(args, self.device, self.args.template)
 
     def get_TREx_parameters(self):
-        relation = load_file(join(self.args.data_dir, "single_relations/{}.jsonl".format(self.args.relation_id)))[0]
-        data_path_pre = "fact-retrieval/original/{}/".format(self.args.relation_id)
-        data_path_post = ".jsonl"
+        relations_file_path = join(self.args.data_dir, "single_relations", f"{self.args.relation_id}.jsonl")
+        relations_file_path = os.path.normpath(relations_file_path) # TODO 感觉没用
+        print("relations_file_path :", relations_file_path)
+        relation = load_file(relations_file_path)[0] # 文件中只有一条记录，取第一条就是关系数据。
+        data_path_pre = "fact-retrieval/original/{}/".format(self.args.relation_id) # 这里可以优化应该用 os.path.join()
+        data_path_post = ".jsonl" # 这个预定死的
         return relation, data_path_pre, data_path_post
 
     def evaluate(self, epoch_idx, evaluate_type):

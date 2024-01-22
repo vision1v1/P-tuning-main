@@ -8,6 +8,7 @@ def create_model(args):
         return load_megatron_lm(args)
     MODEL_CLASS, _ = get_model_and_tokenizer_class(args)
     model_name = os.path.join(os.getenv('my_data_dir'), "pretrained", args.model_name) # 本地
+    print("model_name :", model_name)
     model = MODEL_CLASS.from_pretrained(model_name)
     if not args.use_lm_finetune:
         if 'megatron' in args.model_name:
