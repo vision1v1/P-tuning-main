@@ -129,7 +129,7 @@ class Trainer(object):
 
         print("output_dir :", os.path.normpath(os.path.realpath(self.get_save_path())))
 
-        self.train_loader = DataLoader(self.train_set, batch_size=8, shuffle=False, drop_last=True) # shuffle=False 方便调试
+        self.train_loader = DataLoader(self.train_set, batch_size=1, shuffle=False, drop_last=True) # shuffle=False 方便调试
         self.dev_loader = DataLoader(self.dev_set, batch_size=8)
         self.test_loader = DataLoader(self.test_set, batch_size=8)
 
@@ -201,7 +201,7 @@ class Trainer(object):
     def train(self):
         best_dev, early_stop, has_adjusted = 0, 0, True
         best_ckpt = None
-        params = [{'params': self.model.prompt_encoder.parameters()}]
+        params = [{'params': self.model.prompt_encoder.parameters()}] # 被训练 就是 prompt_encoder
         if self.args.use_lm_finetune:
             params.append({'params': self.model.model.parameters(), 'lr': 5e-6})
         optimizer = torch.optim.Adam(params,

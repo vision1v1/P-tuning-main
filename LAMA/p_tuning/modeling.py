@@ -61,18 +61,18 @@ class PTuneForLAMA(torch.nn.Module):
     def embed_input(self, queries):
         bz = queries.shape[0]
         queries_for_embedding = queries.clone()
-        queries_for_embedding[(queries == self.pseudo_token_id)] = self.tokenizer.unk_token_id
+        queries_for_embedding[(queries == self.pseudo_token_id)] = self.tokenizer.unk_token_id # ['[UNK]']
         raw_embeds = self.embeddings(queries_for_embedding)
 
         # For using handcraft prompts
         if self.args.use_original_template:
             return raw_embeds
-
+        # 找到queries中prompt 的位置
         blocked_indices = (queries == self.pseudo_token_id).nonzero().reshape((bz, self.spell_length, 2))[:, :, 1]  # bz
-        replace_embeds = self.prompt_encoder()
+        replace_embeds = self.prompt_encoder() # 提示词 之间的依赖关系 编码
         for bidx in range(bz):
-            for i in range(self.prompt_encoder.spell_length):
-                raw_embeds[bidx, blocked_indices[bidx, i], :] = replace_embeds[i, :]
+            for i in range(self.prompt_encoder.spell_length): # 用带有依赖关系的提示编码，替换到整个模板的embeding中去。
+                raw_embeds[bidx, blocked_indices[bidx, i], :] = replace_embeds[i, :] # 把 queries 中所有的 '[PROMPT]' 替换成 seq_indices 的 
         return raw_embeds
 
     def get_query(self, x_h, prompt_tokens, x_t=None):
@@ -88,12 +88,12 @@ class PTuneForLAMA(torch.nn.Module):
         if 'gpt' not in self.args.model_name and 'megatron' not in self.args.model_name:
             # BERT-style model
             return [[self.tokenizer.cls_token_id]  # [CLS]
-                    + prompt_tokens * self.template[0]
-                    + [self.tokenizer.mask_token_id]  # head entity
-                    + prompt_tokens * self.template[1]
+                    + prompt_tokens * self.template[0] # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
+                    + [self.tokenizer.mask_token_id]  # head entity # [MASK]
+                    + prompt_tokens * self.template[1] # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
                     + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # [MASK] (tail entity)
-                    + (prompt_tokens * self.template[2] if self.template[2] > 0 else self.tokenizer.convert_tokens_to_ids(['.']))
-                    + [self.tokenizer.sep_token_id]]
+                    + (prompt_tokens * self.template[2] if self.template[2] > 0 else self.tokenizer.convert_tokens_to_ids(['.'])) # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
+                    + [self.tokenizer.sep_token_id]] # [SEP]
         elif 'gpt' in self.args.model_name or 'megatron' in self.args.model_name:
             # GPT-style models
             return [prompt_tokens * self.template[0]
@@ -103,21 +103,22 @@ class PTuneForLAMA(torch.nn.Module):
         else:
             raise NotImplementedError("The query template for {} has not been defined.".format(self.args.model_name))
 
-    def forward(self, x_hs, x_ts, return_candidates=False):
+    def forward(self, x_hs, x_ts, return_candidates=False):# x_hs:"sub_label" , x_ts:"obj_label"
         bz = len(x_hs)
 
         # construct query ids
         prompt_tokens = [self.pseudo_token_id]
         x_ts = [token_wrapper(self.args, x_t) for x_t in x_ts]
+        # ['[CLS]', '[PROMPT]', '[PROMPT]', '[PROMPT]', '[MASK]', '[PROMPT]', '[PROMPT]', '[PROMPT]', 'Speaker', 'of', 'the', 'House', 'of', 'Representatives', '[PROMPT]', '[PROMPT]', '[PROMPT]', '[SEP]']
         queries = [torch.LongTensor(self.get_query(x_hs[i], prompt_tokens)).squeeze(0) for i in range(bz)]
-        queries = pad_sequence(queries, True, padding_value=self.pad_token_id).long().to(self.device)
+        queries = pad_sequence(queries, True, padding_value=self.pad_token_id).long().to(self.device) 
 
         # construct label ids
         label_ids = torch.LongTensor(self.tokenizer.convert_tokens_to_ids(x_ts)).reshape((bz, -1)).to(self.device)
         attention_mask = queries != self.pad_token_id
 
         # get embedded input
-        inputs_embeds = self.embed_input(queries)
+        inputs_embeds = self.embed_input(queries) # 这时整个模板被embeding好了。
 
         def bert_out():
             label_mask = (queries == self.tokenizer.mask_token_id).nonzero().reshape(bz, -1)[:, 1].unsqueeze(1).to(self.device)  # bz * 1

@@ -17,7 +17,7 @@ class PromptEncoder(torch.nn.Module):
             + [1] * self.cloze_length[1]  # second cloze
             + [1] * self.cloze_length[2]  # third cloze
         ]
-        self.cloze_mask = torch.LongTensor(self.cloze_mask).bool().to(self.device)
+        self.cloze_mask = torch.LongTensor(self.cloze_mask).bool().to(self.device) # 这个有毛用？
 
         self.seq_indices = torch.LongTensor(list(range(len(self.cloze_mask[0])))).to(self.device)
         # embedding
