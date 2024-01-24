@@ -68,7 +68,8 @@ class PTuneForLAMA(torch.nn.Module):
         if self.args.use_original_template:
             return raw_embeds
         # 找到queries中prompt 的位置
-        blocked_indices = (queries == self.pseudo_token_id).nonzero().reshape((bz, self.spell_length, 2))[:, :, 1]  # bz
+        nonzero_indices = (queries == self.pseudo_token_id).nonzero()
+        blocked_indices = nonzero_indices.reshape((bz, self.spell_length, 2))[:, :, 1]  # bz
         replace_embeds = self.prompt_encoder() # 提示词 之间的依赖关系 编码
         for bidx in range(bz):
             for i in range(self.prompt_encoder.spell_length): # 用带有依赖关系的提示编码，替换到整个模板的embeding中去。
@@ -121,9 +122,9 @@ class PTuneForLAMA(torch.nn.Module):
         inputs_embeds = self.embed_input(queries) # 这时整个模板被embeding好了。
 
         def bert_out():
-            label_mask = (queries == self.tokenizer.mask_token_id).nonzero().reshape(bz, -1)[:, 1].unsqueeze(1).to(self.device)  # bz * 1
+            label_mask_indices = (queries == self.tokenizer.mask_token_id).nonzero().reshape(bz, -1)[:, 1].unsqueeze(1).to(self.device)  # bz * 1
             labels = torch.empty_like(queries).fill_(-100).long().to(self.device)  # bz * seq_len
-            labels = labels.scatter_(1, label_mask, label_ids)
+            labels = labels.scatter_(1, label_mask_indices, label_ids) # label_id 放到 [MASK] 位置上
             output = self.model.forward(inputs_embeds=inputs_embeds.to(self.device),
                                         attention_mask=attention_mask.to(self.device).bool(),
                                         labels=labels.to(self.device))
@@ -133,7 +134,7 @@ class PTuneForLAMA(torch.nn.Module):
             hit1 = 0
             top10 = []
             for i in range(bz):
-                pred_seq = pred_ids[i, label_mask[i, 0]].tolist()
+                pred_seq = pred_ids[i, label_mask_indices[i, 0]].tolist()
                 for pred in pred_seq:
                     if pred in self.allowed_vocab_ids:
                         break
