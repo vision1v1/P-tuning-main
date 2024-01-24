@@ -127,7 +127,8 @@ class RteProcessor(DataProcessor):
     """Processor for the RTE data set."""
 
     def get_train_examples(self, data_dir):
-        return self._create_examples(os.path.join(data_dir, "train.jsonl"), "train")
+        train_file_path = os.path.normpath(os.path.join(data_dir, "train.jsonl"))
+        return self._create_examples(train_file_path, "train")
 
     def get_dev_examples(self, data_dir):
         return self._create_examples(os.path.join(data_dir, "val.jsonl"), "dev")
@@ -585,18 +586,13 @@ def load_examples(task, data_dir: str, set_type: str, *_, num_examples: int = No
                   num_examples_per_label: int = None, seed: int = 42) -> List[InputExample]:
     """Load examples for a given task."""
 
-    assert (num_examples is not None) ^ (num_examples_per_label is not None), \
-        "Exactly one of 'num_examples' and 'num_examples_per_label' must be set."
-    assert (not set_type == UNLABELED_SET) or (num_examples is not None), \
-        "For unlabeled data, 'num_examples_per_label' is not allowed"
+    assert (num_examples is not None) ^ (num_examples_per_label is not None), "Exactly one of 'num_examples' and 'num_examples_per_label' must be set."
+    assert (not set_type == UNLABELED_SET) or (num_examples is not None), "For unlabeled data, 'num_examples_per_label' is not allowed"
 
     processor = PROCESSORS[task]()
 
-    ex_str = f"num_examples={num_examples}" if num_examples is not None \
-        else f"num_examples_per_label={num_examples_per_label}"
-    logger.info(
-        f"Creating features from dataset file at {data_dir} ({ex_str}, set_type={set_type})"
-    )
+    ex_str = f"num_examples={num_examples}" if num_examples is not None else f"num_examples_per_label={num_examples_per_label}"
+    logger.info(f"Creating features from dataset file at {data_dir} ({ex_str}, set_type={set_type})")
 
     if set_type == DEV_SET:
         examples = processor.get_dev_examples(data_dir)

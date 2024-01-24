@@ -26,11 +26,9 @@ import log
 from pet.config import EvalConfig, TrainConfig
 from pet.utils import InputExample, exact_match, save_logits, save_predictions, softmax, LogitsList, set_seed, eq_div
 from pet.wrapper import TransformerModelWrapper
-from pet.config import  WrapperConfig
+from pet.config import WrapperConfig
 
 logger = log.get_logger('root')
-
-
 
 
 def init_model(config: WrapperConfig) -> TransformerModelWrapper:
@@ -53,7 +51,6 @@ def train_pet(train_data: List[InputExample],
               do_eval: bool = True,
               seed: int = 42
               ):
-
     """
     Train and evaluate a new PET model for a given task.
 
@@ -94,9 +91,8 @@ def train_pet(train_data: List[InputExample],
 
             # Training
             if do_train:
-
-                results_dict.update(train_single_model(train_data, eval_data, dev32_data, pattern_iter_output_dir, \
-                                                       wrapper, train_config, eval_config))
+                rs = train_single_model(train_data, eval_data, dev32_data, pattern_iter_output_dir, wrapper, train_config, eval_config)
+                results_dict.update(rs)
 
                 with open(os.path.join(pattern_iter_output_dir, 'results.txt'), 'w') as fh:
                     fh.write(str(results_dict))
@@ -171,35 +167,35 @@ def train_single_model(train_data: List[InputExample],
     """
 
     results_dict = {}
-
-    results_dict['train_set_before_training'] = evaluate(model, train_data, eval_config)['scores']['acc']
+    # TODO 方便调试暂时注释掉
+    # results_dict['train_set_before_training'] = evaluate(model, train_data, eval_config)['scores']['acc']
 
     if not train_data:
         logger.warning('Training method was called without training examples')
     else:
-        global_step, tr_loss = model.train(
-            pattern_iter_output_dir=pattern_iter_output_dir,
-            eval_config=eval_config,
-            train_data=train_data,
-            dev32_data=dev32_data,
-            eval_data=eval_data,
-            per_gpu_train_batch_size=config.per_gpu_train_batch_size,
-            n_gpu=config.n_gpu,
-            num_train_epochs=config.num_train_epochs,
-            max_steps=config.max_steps,
-            gradient_accumulation_steps=config.gradient_accumulation_steps,
-            weight_decay=config.weight_decay,
-            learning_rate=config.learning_rate,
-            adam_epsilon=config.adam_epsilon,
-            warmup_steps=config.warmup_steps,
-            max_grad_norm=config.max_grad_norm,
-            alpha=config.alpha
-        )
+        global_step, tr_loss = model.train(pattern_iter_output_dir=pattern_iter_output_dir,
+                                           eval_config=eval_config,
+                                           train_data=train_data,
+                                           dev32_data=dev32_data,
+                                           eval_data=eval_data,
+                                           per_gpu_train_batch_size=config.per_gpu_train_batch_size,
+                                           n_gpu=config.n_gpu,
+                                           num_train_epochs=config.num_train_epochs,
+                                           max_steps=config.max_steps,
+                                           gradient_accumulation_steps=config.gradient_accumulation_steps,
+                                           weight_decay=config.weight_decay,
+                                           learning_rate=config.learning_rate,
+                                           adam_epsilon=config.adam_epsilon,
+                                           warmup_steps=config.warmup_steps,
+                                           max_grad_norm=config.max_grad_norm,
+                                           alpha=config.alpha)
         results_dict['global_step'] = global_step
         results_dict['average_loss'] = tr_loss
 
     model = TransformerModelWrapper.from_pretrained(pattern_iter_output_dir)
-    results_dict['train_set_after_training'] = evaluate(model, train_data, eval_config)['scores']['acc']
+
+    # TODO 方便调试暂时注释掉
+    # results_dict['train_set_after_training'] = evaluate(model, train_data, eval_config)['scores']['acc']
     return results_dict
 
 
@@ -270,4 +266,3 @@ def _write_results(path: str, all_results: Dict, dev32_results: Dict):
             result_str = "{}-all-p: {} +- {}".format(metric, all_mean, all_stdev)
             logger.info(result_str)
             fh.write(result_str + '\n')
-
