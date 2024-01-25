@@ -124,7 +124,7 @@ class DataProcessor(ABC):
 
 
 class RteProcessor(DataProcessor):
-    """Processor for the RTE data set."""
+    """Processor for the RTE data set. 这个任务是判断前提文本（premise）是否蕴含假设文本（hypothesis），蕴含（entailment）/不蕴含（not_entailment） 二分类"""
 
     def get_train_examples(self, data_dir):
         train_file_path = os.path.normpath(os.path.join(data_dir, "train.jsonl"))
@@ -145,8 +145,7 @@ class RteProcessor(DataProcessor):
     def get_labels(self):
         return ["entailment", "not_entailment"]
 
-    def _create_examples(self, path: str, set_type: str, hypothesis_name: str = "hypothesis",
-                         premise_name: str = "premise") -> List[InputExample]:
+    def _create_examples(self, path: str, set_type: str, hypothesis_name: str = "hypothesis", premise_name: str = "premise") -> List[InputExample]:
         examples = []
 
         with open(path, encoding='utf8') as f:

@@ -21,6 +21,7 @@ from typing import List, Dict, Optional
 
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import numpy as np
 from sklearn.metrics import f1_score
 from tensorboardX import SummaryWriter
@@ -75,7 +76,7 @@ TRAIN_STEP_FUNCTIONS = {
 }
 
 
-class ContinuousPrompt(torch.nn.Module):
+class ContinuousPrompt(nn.Module):
     def __init__(self, config: WrapperConfig, tokenizer):
         super(ContinuousPrompt, self).__init__()
         self.config = config
@@ -85,43 +86,40 @@ class ContinuousPrompt(torch.nn.Module):
         self.prompt_length = self.config.pattern_id  # The pattern_id is supposed to indicate the number of continuous prompt tokens.
 
         config_class = MODEL_CLASSES[self.config.model_type]['config']
-        model_config = config_class.from_pretrained(
-            config.model_name_or_path,
-            num_labels=len(config.label_list),
-            finetuning_task=config.task_name,
-            cache_dir=config.cache_dir if config.cache_dir else None,
-            use_cache=False)
+        model_config = config_class.from_pretrained(config.model_name_or_path,
+                                                    num_labels=len(config.label_list),
+                                                    finetuning_task=config.task_name,
+                                                    cache_dir=config.cache_dir if config.cache_dir else None,
+                                                    use_cache=False)
 
         model_class = MODEL_CLASSES[self.config.model_type][MLM_WRAPPER]
-        self.model = model_class.from_pretrained(
-            config.model_name_or_path,
-            config=model_config,
-            cache_dir=config.cache_dir if config.cache_dir else None)
+        self.model = model_class.from_pretrained(config.model_name_or_path,
+                                                 config=model_config,
+                                                 cache_dir=config.cache_dir if config.cache_dir else None)
 
-        self.prompt_embeddings = torch.nn.Embedding(self.prompt_length, self.embed_size)
+        self.prompt_embeddings = nn.Embedding(self.prompt_length, self.embed_size)
         if config.prompt_encoder_type == "lstm":
-            self.lstm_head = torch.nn.LSTM(input_size=self.hidden_size,
-                                           hidden_size=self.hidden_size,
-                                           num_layers=2,
-                                           bidirectional=True,
-                                           batch_first=True)
+            self.lstm_head = nn.LSTM(input_size=self.hidden_size,
+                                     hidden_size=self.hidden_size,
+                                     num_layers=2,
+                                     bidirectional=True,
+                                     batch_first=True)
             self.mlp_head = nn.Sequential(nn.Linear(2 * self.hidden_size, self.hidden_size),
                                           nn.ReLU(),
                                           nn.Linear(self.hidden_size, self.hidden_size))
         elif config.prompt_encoder_type == "mlp":
-            self.mlp = torch.nn.Sequential(
-                torch.nn.Linear(self.hidden_size, self.hidden_size),
-                torch.nn.ReLU(),
-                torch.nn.Linear(self.hidden_size, self.hidden_size))
+            self.mlp = nn.Sequential(nn.Linear(self.hidden_size, self.hidden_size),
+                                     nn.ReLU(),
+                                     nn.Linear(self.hidden_size, self.hidden_size))
         else:
             raise ValueError('unknown prompt_encoder_type.')
 
     def forward(self, inputs_embeds=None, attention_mask=None, token_type_ids=None, labels=None):
 
-        return self.model(inputs_embeds=inputs_embeds,
-                          attention_mask=attention_mask,
-                          labels=labels,
-                          token_type_ids=token_type_ids)
+        return self.model.forward(inputs_embeds=inputs_embeds,
+                                  attention_mask=attention_mask,
+                                  labels=labels,
+                                  token_type_ids=token_type_ids)
 
 
 class TransformerModelWrapper:
@@ -131,9 +129,8 @@ class TransformerModelWrapper:
         self.config = config
 
         tokenizer_class = MODEL_CLASSES[self.config.model_type]['tokenizer']
-        self.tokenizer = tokenizer_class.from_pretrained(
-            config.model_name_or_path,
-            cache_dir=config.cache_dir if config.cache_dir else None)
+        self.tokenizer = tokenizer_class.from_pretrained(config.model_name_or_path,
+                                                         cache_dir=config.cache_dir if config.cache_dir else None)
 
         self.model = ContinuousPrompt(config, self.tokenizer)
 
@@ -144,8 +141,8 @@ class TransformerModelWrapper:
         self.task_helper = TASK_HELPERS[self.config.task_name](self) if self.config.task_name in TASK_HELPERS else None
 
         if torch.cuda.device_count() > 1:
-            self.model = torch.nn.DataParallel(self.model)
-        self.model.cuda()
+            self.model = nn.DataParallel(self.model)
+        # self.model.cuda() # TODO 如果是cpu时，错误了
 
     def save(self, path: str) -> None:
         logger.info("Saving models.")
@@ -198,11 +195,10 @@ class TransformerModelWrapper:
 
         wrapper.preprocessor = PREPROCESSORS[MLM_WRAPPER](wrapper, wrapper.config.task_name, wrapper.config.pattern_id)
 
-        wrapper.task_helper = TASK_HELPERS[wrapper.config.task_name](wrapper) \
-            if wrapper.config.task_name in TASK_HELPERS else None
+        wrapper.task_helper = TASK_HELPERS[wrapper.config.task_name](wrapper) if wrapper.config.task_name in TASK_HELPERS else None
 
         if torch.cuda.device_count() > 1:
-            wrapper.model = torch.nn.DataParallel(wrapper.model)
+            wrapper.model = nn.DataParallel(wrapper.model)
         wrapper.model.cuda()
 
         return wrapper
@@ -232,7 +228,8 @@ class TransformerModelWrapper:
               warmup_steps=0,
               max_grad_norm: float = 1,
               logging_steps: int = 50,
-              max_steps=-1, **_):
+              max_steps=-1, 
+              device="cpu", **_):
         """
         Train the underlying language model.
 
@@ -262,14 +259,21 @@ class TransformerModelWrapper:
         else:
             t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
 
-        print("\n")
-        print("num_steps_per_dataset:")
-        print(len(train_dataloader) // gradient_accumulation_steps)
-        print("total_steps:")
-        print(t_total)
-        print("num_train_epochs:")
-        print(num_train_epochs)
-        print("\n")
+        before_training = {
+            "num_steps_per_dataset:": len(train_dataloader) // gradient_accumulation_steps,
+            "total_steps": t_total,
+            "num_train_epochs": num_train_epochs
+        }
+        logger.info(f"before_training: \n{json.dumps(before_training, indent=2)}")
+
+        # print("\n")
+        # print("num_steps_per_dataset:")
+        # print(len(train_dataloader) // gradient_accumulation_steps)
+        # print("total_steps:")
+        # print(t_total)
+        # print("num_train_epochs:")
+        # print(num_train_epochs)
+        # print("\n")
 
         cur_model = self.model.module if hasattr(self.model, 'module') else self.model
 
@@ -292,10 +296,12 @@ class TransformerModelWrapper:
                 {'params': [p for p in cur_model.prompt_embeddings.parameters()]}
             ]
 
-        optimizer = AdamW(optimizer_grouped_parameters, lr=1e-5, eps=adam_epsilon)
+        # optimizer = AdamW(optimizer_grouped_parameters, lr=1e-5, eps=adam_epsilon) # TODO 废弃的
+        optimizer = optim.AdamW(optimizer_grouped_parameters, lr=1e-5, eps=adam_epsilon)
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
 
-        embedding_optimizer = AdamW(embedding_parameters, lr=learning_rate, eps=adam_epsilon)
+        # embedding_optimizer = AdamW(embedding_parameters, lr=learning_rate, eps=adam_epsilon) # TODO 废弃的
+        embedding_optimizer = optim.AdamW(embedding_parameters, lr=learning_rate, eps=adam_epsilon)
         embedding_scheduler = get_linear_schedule_with_warmup(embedding_optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
 
         writer = SummaryWriter(log_dir=os.path.join(self.config.output_dir, "writer_logs"))
@@ -313,19 +319,20 @@ class TransformerModelWrapper:
         self.model.zero_grad()
 
         logger.info("dev32_data performance before training.")
-        dev32_scores = self.eval_dev(dev32_data, eval_config, n_gpu)
-        logger.info(dev32_scores)
+        # dev32_scores = self.eval_dev(dev32_data, eval_config, n_gpu) # TODO 方便调试暂时注释
+        # logger.info(dev32_scores)
 
         logger.info("eval_data performance before training.")
-        dev_scores = self.eval_dev(eval_data, eval_config, n_gpu)
-        logger.info(dev_scores)
+        # dev_scores = self.eval_dev(eval_data, eval_config, n_gpu) # TODO 方便调试暂时注释
+        # logger.info(dev_scores)
 
         train_iterator = trange(int(num_train_epochs), desc="Epoch")
         for _ in train_iterator:
             epoch_iterator = tqdm(train_dataloader, desc="Iteration", dynamic_ncols=True, ascii=' >>', colour='green')
             for step, batch in enumerate(epoch_iterator):
                 self.model.train()
-                batch = {k: t.cuda() for k, t in batch.items()}
+                if device != 'cpu':
+                    batch = {k: t.cuda() for k, t in batch.items()}
 
                 loss = self.task_helper.train_step(batch) if self.task_helper else None
                 if loss is None:
@@ -382,8 +389,7 @@ class TransformerModelWrapper:
                                 best_loss = tr_loss
 
                                 logger.info("Saving trained model at {}...".format(pattern_iter_output_dir))
-                                logger.info("best_dev32_acc: %.4f | best_dev32_f1: %.4f | best_global_step: %d" %
-                                            (best_dev32_acc, best_dev32_f1, best_global_step))
+                                logger.info("best_dev32_acc: %.4f | best_dev32_f1: %.4f | best_global_step: %d" % (best_dev32_acc, best_dev32_f1, best_global_step))
                                 logger.info(dev32_scores)
 
                                 self.save(pattern_iter_output_dir)
@@ -407,8 +413,7 @@ class TransformerModelWrapper:
                                 best_loss = tr_loss
 
                                 logger.info("Saving trained model at {}...".format(pattern_iter_output_dir))
-                                logger.info("best_dev32_acc: %.4f | best_global_step: %d" %
-                                            (best_dev32_acc, best_global_step))
+                                logger.info("best_dev32_acc: %.4f | best_global_step: %d" % (best_dev32_acc, best_global_step))
 
                                 self.save(pattern_iter_output_dir)
                                 logger.info("eval_data performance:")
@@ -546,9 +551,9 @@ class TransformerModelWrapper:
             raw_embeds = model.model.bert.embeddings.word_embeddings(input_ids)
         elif self.config.model_type == "roberta":
             raw_embeds = model.model.roberta.embeddings.word_embeddings(input_ids)
-
-        replace_embeds = model.prompt_embeddings(
-            torch.LongTensor(list(range(model.prompt_length))).cuda())
+        
+        prompt = torch.LongTensor(list(range(model.prompt_length)), device=input_ids.device)
+        replace_embeds = model.prompt_embeddings(prompt)
         replace_embeds = replace_embeds.unsqueeze(0)  # [batch_size, prompt_length, embed_size]
 
         if self.config.prompt_encoder_type == "lstm":

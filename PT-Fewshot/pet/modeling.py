@@ -49,8 +49,7 @@ def train_pet(train_data: List[InputExample],
               repetitions: int = 3,
               do_train: bool = True,
               do_eval: bool = True,
-              seed: int = 42
-              ):
+              seed: int = 42):
     """
     Train and evaluate a new PET model for a given task.
 
@@ -87,7 +86,9 @@ def train_pet(train_data: List[InputExample],
             if not os.path.exists(pattern_iter_output_dir):
                 os.makedirs(pattern_iter_output_dir)
 
-            wrapper = init_model(model_config)
+            wrapper = init_model(model_config) # 返回是model 的wrapper
+            if train_config.device != 'cpu':
+                wrapper.model.cuda()
 
             # Training
             if do_train:
@@ -188,7 +189,8 @@ def train_single_model(train_data: List[InputExample],
                                            adam_epsilon=config.adam_epsilon,
                                            warmup_steps=config.warmup_steps,
                                            max_grad_norm=config.max_grad_norm,
-                                           alpha=config.alpha)
+                                           alpha=config.alpha,
+                                           device=config.device)
         results_dict['global_step'] = global_step
         results_dict['average_loss'] = tr_loss
 
