@@ -581,10 +581,9 @@ DEV32_SET = "dev32"
 SET_TYPES = [TRAIN_SET, DEV_SET, TEST_SET, UNLABELED_SET, DEV32_SET]
 
 
-def load_examples(task, data_dir: str, set_type: str, *_, num_examples: int = None,
-                  num_examples_per_label: int = None, seed: int = 42) -> List[InputExample]:
+def load_examples(task, data_dir: str, set_type: str, *_, num_examples: int = None, num_examples_per_label: int = None, seed: int = 42) -> List[InputExample]:
     """Load examples for a given task."""
-
+    # ^ 是按位 异或
     assert (num_examples is not None) ^ (num_examples_per_label is not None), "Exactly one of 'num_examples' and 'num_examples_per_label' must be set."
     assert (not set_type == UNLABELED_SET) or (num_examples is not None), "For unlabeled data, 'num_examples_per_label' is not allowed"
 
@@ -617,7 +616,7 @@ def load_examples(task, data_dir: str, set_type: str, *_, num_examples: int = No
             limited_examples.add(example)
         examples = limited_examples.to_list()
 
-    label_distribution = Counter(example.label for example in examples)
+    label_distribution = Counter(example.label for example in examples) # 统计 label 比例
     logger.info(f"Returning {len(examples)} {set_type} examples with label dist.: {list(label_distribution.items())}")
 
     return examples

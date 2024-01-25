@@ -29,16 +29,16 @@ def __setup_custom_logger(name: str) -> logging.Logger:
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
-    ## TODO
-    file_handler = logging.FileHandler(name + ".txt")
-    file_handler.setFormatter(formatter)
+    ## TODO 暂时用不上 注释掉
+    # file_handler = logging.FileHandler(name + ".txt")
+    # file_handler.setFormatter(formatter)
 
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
 
     ## TODO
-    logger.addHandler(file_handler)
+    # logger.addHandler(file_handler)
 
     return logger
 

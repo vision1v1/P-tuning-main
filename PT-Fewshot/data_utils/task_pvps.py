@@ -105,8 +105,7 @@ class PVP(ABC):
             return PVP.lowercase_first(s[0]), s[1]
         return s[0].lower() + s[1:]
 
-    def encode(self, example: InputExample, priming: bool = False, labeled: bool = False) \
-            -> Tuple[List[int], List[int]]:
+    def encode(self, example: InputExample, priming: bool = False, labeled: bool = False) -> Tuple[List[int], List[int]]:
         """
         Encode an input example using this pattern-verbalizer pair.
 
@@ -225,8 +224,7 @@ class PVP(ABC):
     def _convert_single_mlm_logits_to_cls_logits(self, logits: torch.Tensor) -> torch.Tensor:
         m2c = self.mlm_logits_to_cls_logits_tensor.to(logits.device)
         # filler_len.shape() == max_fillers
-        filler_len = torch.tensor([len(self.verbalize(label)) for label in self.wrapper.config.label_list],
-                                  dtype=torch.float)
+        filler_len = torch.tensor([len(self.verbalize(label)) for label in self.wrapper.config.label_list], dtype=torch.float)
         filler_len = filler_len.to(logits.device)
 
         # cls_logits.shape() == num_labels x max_fillers  (and 0 when there are not as many fillers).

@@ -28,6 +28,7 @@ from pet.wrapper import MODEL_CLASSES
 from pet.config import TrainConfig, EvalConfig, WrapperConfig
 from pet.modeling import train_pet
 
+from datetime import datetime
 import log
 logger = log.get_logger('root')
 
@@ -114,6 +115,9 @@ def main():
     args = parser.parse_args()
     args_info = json.dumps(args.__dict__, indent=2)
     logger.info(f"Parameters: \n{args_info}")
+
+    now = datetime.now()
+    args.output_dir = f"{args.output_dir}-{now.hour}-{now.minute}-{now.second}" # TODO 调试方便方便反复删除
 
     if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train and not args.overwrite_output_dir:
         raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))

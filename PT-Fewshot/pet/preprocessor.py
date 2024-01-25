@@ -35,8 +35,7 @@ class Preprocessor(ABC):
         self.label_map = {label: i for i, label in enumerate(self.wrapper.config.label_list)}
 
     @abstractmethod
-    def get_input_features(self, example: InputExample, labelled: bool, priming: bool = False,
-                           **kwargs) -> InputFeatures:
+    def get_input_features(self, example: InputExample, labelled: bool, priming: bool = False, **kwargs) -> InputFeatures:
         """Convert the given example into a set of input features"""
         pass
 
@@ -44,11 +43,9 @@ class Preprocessor(ABC):
 class MLMPreprocessor(Preprocessor):
     """Preprocessor for models pretrained using a masked language modeling objective (e.g., BERT)."""
 
-    def get_input_features(self, example: InputExample, labelled: bool, priming: bool = False,
-                           **kwargs) -> InputFeatures:
+    def get_input_features(self, example: InputExample, labelled: bool, priming: bool = False, **kwargs) -> InputFeatures:
 
         input_ids, token_type_ids, block_flag = self.pvp.encode(example)
-
         attention_mask = [1] * len(input_ids)
         padding_length = self.wrapper.config.max_seq_length - len(input_ids)
 

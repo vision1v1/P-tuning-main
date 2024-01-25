@@ -326,7 +326,7 @@ class TransformerModelWrapper:
         # dev_scores = self.eval_dev(eval_data, eval_config, n_gpu) # TODO 方便调试暂时注释
         # logger.info(dev_scores)
 
-        train_iterator = trange(int(num_train_epochs), desc="Epoch")
+        train_iterator = trange(int(num_train_epochs), desc="Epoch", dynamic_ncols=True, ascii=' >>', colour='green')
         for _ in train_iterator:
             epoch_iterator = tqdm(train_dataloader, desc="Iteration", dynamic_ncols=True, ascii=' >>', colour='green')
             for step, batch in enumerate(epoch_iterator):
