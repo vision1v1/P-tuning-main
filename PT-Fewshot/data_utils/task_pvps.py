@@ -124,7 +124,7 @@ class PVP(ABC):
         parts_a = [x if isinstance(x, tuple) else (x, False) for x in parts_a]
         parts_a = [(tokenizer.encode(x, add_special_tokens=False, **kwargs), s) for x, s in parts_a if x]
 
-        if parts_b:
+        if parts_b: # parts_b 为list，python 判断list中是否为空
             parts_b = [x if isinstance(x, tuple) else (x, False) for x in parts_b]
             parts_b = [(tokenizer.encode(x, add_special_tokens=False, **kwargs), s) for x, s in parts_b if x]
 
@@ -275,7 +275,7 @@ class RtePVP(PVP):
         text_a = self.shortenable(example.text_a)
         text_b = self.shortenable(example.text_b.rstrip(string.punctuation))
 
-        if self.pattern_id == 1:
+        if self.pattern_id == 1: # 就这一种模式的模板
             
             # searched patterns in fully-supervised.
             # string_list_a = [text_a, '[SEP]', text_b, "?", "the" , self.mask]
@@ -283,9 +283,9 @@ class RtePVP(PVP):
             # string_list_a = [text_a, 'Question:', text_b, "?", "the" , self.mask]
             
             # few-shot
-            string_list_a = [text_a, 'Question:', text_b, "?", "the", "Answer:", self.mask, "."]
+            string_list_a = [text_a, 'Question:', text_b, "?", "the", "Answer:", self.mask, "."] # 这个就是模板
             string_list_b = []
-            block_flag_a = [0, 0, 0, 0, 1, 0, 0, 0]
+            block_flag_a = [0, 0, 0, 0, 1, 0, 0, 0] # ？这作用？
             block_flag_b = []
             assert len(string_list_a) == len(block_flag_a)
             assert len(string_list_b) == len(block_flag_b)

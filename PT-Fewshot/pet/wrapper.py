@@ -336,7 +336,8 @@ class TransformerModelWrapper:
 
                 loss = self.task_helper.train_step(batch) if self.task_helper else None
                 if loss is None:
-                    loss = TRAIN_STEP_FUNCTIONS[MLM_WRAPPER](self)(batch)
+                    # loss = TRAIN_STEP_FUNCTIONS[MLM_WRAPPER](self)(batch) # mlm_train_step
+                    loss = self.mlm_train_step(batch) # TODO 方便调试，直接拆解开，不过原有设计没有看出什么用处。
 
                 if n_gpu > 1:
                     loss = loss.mean()  # mean() to average on multi-gpu parallel training
