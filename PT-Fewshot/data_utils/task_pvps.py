@@ -56,8 +56,8 @@ class PVP(ABC):
         """
 
         ## if self.wrapper.config.wrapper_type in [wrp.MLM_WRAPPER, wrp.PLM_WRAPPER]:
-
-        self.mlm_logits_to_cls_logits_tensor = self._build_mlm_logits_to_cls_logits_tensor()
+        # 就是将 数据中label标签（目标token），转成口语化后同等含义的token，目的是词表中存在在个目标token，例如 将 not_entailment 转成 No , entailment 转成 Yes
+        self.mlm_logits_to_cls_logits_tensor = self._build_mlm_logits_to_cls_logits_tensor() # ??? 这里的命名 有些问题
 
     def _build_mlm_logits_to_cls_logits_tensor(self):
         label_list = self.wrapper.config.label_list
@@ -66,7 +66,7 @@ class PVP(ABC):
         for label_idx, label in enumerate(label_list):
             verbalizers = self.verbalize(label)
             for verbalizer_idx, verbalizer in enumerate(verbalizers):
-                verbalizer_id = get_verbalization_ids(verbalizer, self.wrapper.tokenizer, force_single_token=True)
+                verbalizer_id = get_verbalization_ids(verbalizer, self.wrapper.tokenizer, force_single_token=True) # 返回 标签token 对应 同等含义的口语化后的 token 的token_id
                 assert verbalizer_id != self.wrapper.tokenizer.unk_token_id, "verbalization was tokenized as <UNK>"
                 m2c_tensor[label_idx, verbalizer_idx] = verbalizer_id
         return m2c_tensor
@@ -222,7 +222,7 @@ class PVP(ABC):
         return cls_logits
 
     def _convert_single_mlm_logits_to_cls_logits(self, logits: torch.Tensor) -> torch.Tensor:
-        m2c = self.mlm_logits_to_cls_logits_tensor.to(logits.device)
+        m2c = self.mlm_logits_to_cls_logits_tensor.to(logits.device) # TODO mlm_logits_to_cls_logits_tensor 作用
         # filler_len.shape() == max_fillers
         filler_len = torch.tensor([len(self.verbalize(label)) for label in self.wrapper.config.label_list], dtype=torch.float)
         filler_len = filler_len.to(logits.device)
