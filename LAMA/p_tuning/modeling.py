@@ -29,12 +29,12 @@ class PTuneForLAMA(torch.nn.Module):
         tokenizer_src = 'roberta-large' if 'megatron' in self.args.model_name else self.args.model_name
         tokenizer_src = os.path.join(os.getenv('my_data_dir'), "pretrained", tokenizer_src)  # 本地
         print("tokenizer_src :", tokenizer_src)
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_src, use_fast=False) # TODO tokenizer 应该通过初始化函数 注入进来的。
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_src, use_fast=False)  # TODO tokenizer 应该通过初始化函数 注入进来的。
 
         # load pre-trained model
         if 'megatron' in self.args.model_name and self.args.use_lm_finetune:
             raise RuntimeError("Can not apply args.use_lm_finetune=True on MegatronLM 11B.")
-        self.model = create_model(self.args) # TODO 这个也应该从初始化注入进来。
+        self.model = create_model(self.args)  # TODO 这个也应该从初始化注入进来。
         self.model = self.model.to(self.device)
         for param in self.model.parameters():
             param.requires_grad = self.args.use_lm_finetune  # 模型都被冻住
@@ -61,24 +61,24 @@ class PTuneForLAMA(torch.nn.Module):
     def embed_input(self, queries):
         bz = queries.shape[0]
         queries_for_embedding = queries.clone()
-        queries_for_embedding[(queries == self.pseudo_token_id)] = self.tokenizer.unk_token_id # ['[UNK]']
+        queries_for_embedding[(queries == self.pseudo_token_id)] = self.tokenizer.unk_token_id  # ['[UNK]']
         raw_embeds = self.embeddings(queries_for_embedding)
 
         # For using handcraft prompts
         if self.args.use_original_template:
             return raw_embeds
         # 找到queries中prompt 的位置
-        nonzero_indices = (queries == self.pseudo_token_id).nonzero()
-        blocked_indices = nonzero_indices.reshape((bz, self.spell_length, 2))[:, :, 1]  # bz
-        replace_embeds = self.prompt_encoder() # 提示词 之间的依赖关系 编码
+        prompt_indices = (queries == self.pseudo_token_id).nonzero() # prompt_indices
+        blocked_indices = prompt_indices.reshape((bz, self.spell_length, 2))[:, :, 1]  # 找出所有 '[PROMPT]' block 就是 提示词的位置
+        replace_embeds = self.prompt_encoder()  # 提示词 之间的依赖关系 编码
         for bidx in range(bz):
-            for i in range(self.prompt_encoder.spell_length): # 用带有依赖关系的提示编码，替换到整个模板的embeding中去。
-                raw_embeds[bidx, blocked_indices[bidx, i], :] = replace_embeds[i, :] # 把 queries 中所有的 '[PROMPT]' 替换成 seq_indices 的 
+            for i in range(self.prompt_encoder.spell_length):  # 用带有依赖关系的提示编码，替换到整个模板的embeding中去。
+                raw_embeds[bidx, blocked_indices[bidx, i], :] = replace_embeds[i, :]  # 把 queries 中所有的 '[PROMPT]' 替换成 seq_indices 的
         return raw_embeds
 
     def get_query(self, x_h, prompt_tokens, x_t=None):
         # For using handcraft prompts
-        if self.args.use_original_template:
+        if self.args.use_original_template:  # 使用原始模板
             if 'gpt' in self.args.model_name or 'megatron' in self.args.model_name:
                 query = re.sub(r'\[Y\].*', '', self.relation_templates[self.args.relation_id].replace('[X]', x_h))
                 return self.tokenizer(' ' + query)['input_ids']
@@ -87,14 +87,30 @@ class PTuneForLAMA(torch.nn.Module):
                 return self.tokenizer(' ' + query)['input_ids']
         # For P-tuning
         if 'gpt' not in self.args.model_name and 'megatron' not in self.args.model_name:
+
+            cls_id = [self.tokenizer.cls_token_id]
+            template_0_ids = prompt_tokens * self.template[0]
+            mask_ids = [self.tokenizer.mask_token_id]
+            template_1_ids = prompt_tokens * self.template[0]
+            x_h_ids = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))
+            template_2_ids = (prompt_tokens * self.template[2] if self.template[2] > 0 else self.tokenizer.convert_tokens_to_ids(['.']))
+            sep_id = [self.tokenizer.sep_token_id]
+
+            query_template = [cls_id + template_0_ids + mask_ids + template_1_ids + x_h_ids + template_2_ids + sep_id]
+            print(query_template)
+
             # BERT-style model
-            return [[self.tokenizer.cls_token_id]  # [CLS]
-                    + prompt_tokens * self.template[0] # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
-                    + [self.tokenizer.mask_token_id]  # head entity # [MASK]
-                    + prompt_tokens * self.template[1] # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
-                    + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # [MASK] (tail entity)
-                    + (prompt_tokens * self.template[2] if self.template[2] > 0 else self.tokenizer.convert_tokens_to_ids(['.'])) # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
-                    + [self.tokenizer.sep_token_id]] # [SEP]
+            query_template = [[self.tokenizer.cls_token_id]  # [CLS]
+                              + prompt_tokens * self.template[0]  # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
+                              + [self.tokenizer.mask_token_id]  # head entity # [MASK]
+                              + prompt_tokens * self.template[1]  # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
+                              + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # (tail entity)
+                              + (prompt_tokens * self.template[2] if self.template[2] > 0 else self.tokenizer.convert_tokens_to_ids(['.']))  # ['[PROMPT]', '[PROMPT]', '[PROMPT]']
+                              + [self.tokenizer.sep_token_id]]  # [SEP]
+            
+            print(query_template)
+            return query_template
+
         elif 'gpt' in self.args.model_name or 'megatron' in self.args.model_name:
             # GPT-style models
             return [prompt_tokens * self.template[0]
@@ -104,7 +120,7 @@ class PTuneForLAMA(torch.nn.Module):
         else:
             raise NotImplementedError("The query template for {} has not been defined.".format(self.args.model_name))
 
-    def forward(self, x_hs, x_ts, return_candidates=False):# x_hs:"sub_label" , x_ts:"obj_label"
+    def forward(self, x_hs, x_ts, return_candidates=False):  # x_hs:"sub_label" , x_ts:"obj_label"
         bz = len(x_hs)
 
         # construct query ids
@@ -112,19 +128,19 @@ class PTuneForLAMA(torch.nn.Module):
         x_ts = [token_wrapper(self.args, x_t) for x_t in x_ts]
         # ['[CLS]', '[PROMPT]', '[PROMPT]', '[PROMPT]', '[MASK]', '[PROMPT]', '[PROMPT]', '[PROMPT]', 'Speaker', 'of', 'the', 'House', 'of', 'Representatives', '[PROMPT]', '[PROMPT]', '[PROMPT]', '[SEP]']
         queries = [torch.LongTensor(self.get_query(x_hs[i], prompt_tokens)).squeeze(0) for i in range(bz)]
-        queries = pad_sequence(queries, True, padding_value=self.pad_token_id).long().to(self.device) 
+        queries = pad_sequence(queries, True, padding_value=self.pad_token_id).long().to(self.device)
 
         # construct label ids
         label_ids = torch.LongTensor(self.tokenizer.convert_tokens_to_ids(x_ts)).reshape((bz, -1)).to(self.device)
         attention_mask = queries != self.pad_token_id
 
         # get embedded input
-        inputs_embeds = self.embed_input(queries) # 这时整个模板被embeding好了。
+        inputs_embeds = self.embed_input(queries)  # 这时整个模板被embeding好了。
 
         def bert_out():
             label_mask_indices = (queries == self.tokenizer.mask_token_id).nonzero().reshape(bz, -1)[:, 1].unsqueeze(1).to(self.device)  # bz * 1
             labels = torch.empty_like(queries).fill_(-100).long().to(self.device)  # bz * seq_len
-            labels = labels.scatter_(1, label_mask_indices, label_ids) # label_id 放到 [MASK] 位置上
+            labels = labels.scatter_(1, label_mask_indices, label_ids)  # label_id 放到 [MASK] 位置上
             output = self.model.forward(inputs_embeds=inputs_embeds.to(self.device),
                                         attention_mask=attention_mask.to(self.device).bool(),
                                         labels=labels.to(self.device))

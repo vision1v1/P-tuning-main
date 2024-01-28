@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 import argparse
 import torch
+import json
 
 
 SUPPORT_MODELS = ['bert-base-cased',
@@ -116,8 +117,11 @@ class Trainer(object):
         # load_data_dir = os.path.normpath(join(self.args.data_dir, self.data_path_pre))
         load_data_dir = os.path.normpath(os.path.join(args.data_dir, f"fact-retrieval/original/{args.relation_id}/"))
         print("load_data_dir :", load_data_dir)
+        train_data_file = join(load_data_dir, 'train.jsonl')
+        print("train_data_file :", train_data_file, end='\n\n')
+        self.train_data = load_file(train_data_file)
+        print("first data :", json.dumps(self.train_data[0], indent=2, ensure_ascii=False), sep='\n', end='\n\n')
 
-        self.train_data = load_file(join(load_data_dir, 'train.jsonl'))
         self.dev_data = load_file(join(load_data_dir, 'dev.jsonl'))
         self.test_data = load_file(join(load_data_dir, 'test.jsonl'))
 
@@ -202,7 +206,7 @@ class Trainer(object):
         best_dev, early_stop, has_adjusted = 0, 0, True
         best_ckpt = None
         params = [{'params': self.model.prompt_encoder.parameters()}] # 被训练 就是 prompt_encoder
-        if self.args.use_lm_finetune:
+        if self.args.use_lm_finetune: # 微调时，模型参数也一起调
             params.append({'params': self.model.model.parameters(), 'lr': 5e-6})
         optimizer = torch.optim.Adam(params,
                                      lr=self.args.lr,

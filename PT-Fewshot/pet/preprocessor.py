@@ -63,7 +63,7 @@ class MLMPreprocessor(Preprocessor):
         assert len(block_flag) == self.wrapper.config.max_seq_length
 
         label = self.label_map[example.label] if example.label is not None else -100
-        logits = example.logits if example.logits else [-1]
+        logits = example.logits if example.logits else [-1] # TODO 是将 [0, 1] 分类 转成 [-1, 1] 分类了？
 
         if labelled:
             mlm_labels = self.pvp.get_mask_positions(input_ids)

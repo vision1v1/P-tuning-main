@@ -83,7 +83,7 @@ class ContinuousPrompt(nn.Module):
         self.tokenizer = tokenizer
         self.embed_size = config.embed_size
         self.hidden_size = self.embed_size
-        self.prompt_length = self.config.pattern_id  # The pattern_id is supposed to indicate the number of continuous prompt tokens.
+        self.prompt_length = self.config.pattern_id  # TODO pattern_id 表示连续提示词数量  The pattern_id is supposed to indicate the number of continuous prompt tokens.
 
         config_class = MODEL_CLASSES[self.config.model_type]['config']
         model_config = config_class.from_pretrained(config.model_name_or_path,
@@ -249,7 +249,7 @@ class TransformerModelWrapper:
         """
 
         train_batch_size = per_gpu_train_batch_size * max(1, n_gpu)
-        train_dataset = self._generate_dataset(train_data)
+        train_dataset = self._generate_dataset(train_data) # 调试数据开始
         train_sampler = RandomSampler(train_dataset)
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=train_batch_size)
 

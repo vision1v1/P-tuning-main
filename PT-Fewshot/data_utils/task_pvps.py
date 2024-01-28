@@ -130,9 +130,9 @@ class PVP(ABC):
 
         # self.truncate(parts_a, parts_b, max_length=self.wrapper.config.max_seq_length)
         num_special = self.wrapper.tokenizer.num_special_tokens_to_add(bool(parts_b))
-        self.truncate(parts_a, parts_b, max_length=self.wrapper.config.max_seq_length - num_special)
+        self.truncate(parts_a, parts_b, max_length=self.wrapper.config.max_seq_length - num_special) # 在序列维度上截断
 
-        tokens_a = [token_id for part, _ in parts_a for token_id in part]
+        tokens_a = [token_id for part, _ in parts_a for token_id in part] # token_id 展平
         # tokens_b = [token_id for part, _ in parts_b for token_id in part] if parts_b else None
         tokens_b = [token_id for part, _ in parts_b for token_id in part] if parts_b else []
 
@@ -173,7 +173,7 @@ class PVP(ABC):
         parts[last_idx] = (parts[last_idx][0][:-1], parts[last_idx][1])
 
     def truncate(self, parts_a: List[Tuple[str, bool]], parts_b: List[Tuple[str, bool]], max_length: int):
-        """Truncate two sequences of text to a predefined total maximum length"""
+        """Truncate two sequences of text to a predefined total maximum length 在序列维度上截断"""
         total_len = self._seq_length(parts_a) + self._seq_length(parts_b)
         total_len += self.wrapper.tokenizer.num_special_tokens_to_add(bool(parts_b))
         num_tokens_to_remove = total_len - max_length
@@ -285,7 +285,7 @@ class RtePVP(PVP):
             # few-shot
             string_list_a = [text_a, 'Question:', text_b, "?", "the", "Answer:", self.mask, "."] # 这个就是模板
             string_list_b = []
-            block_flag_a = [0, 0, 0, 0, 1, 0, 0, 0] # ？这作用？
+            block_flag_a = [0, 0, 0, 0, 1, 0, 0, 0] # the 作为连续提示词，其它的呢？
             block_flag_b = []
             assert len(string_list_a) == len(block_flag_a)
             assert len(string_list_b) == len(block_flag_b)
