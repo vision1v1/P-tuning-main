@@ -18,7 +18,16 @@ def rte_data():
         "label": "not_entailment",
         "idx": 2363
     }
-    return data
+
+    # 方便调试跟踪
+    debug_data = {
+        "premise": "Even the most draconian proposal .",
+        "hypothesis": "JFK airport is in New York.",
+        "label": "not_entailment",
+        "idx": 2363
+    }
+
+    return debug_data
 
 
 def data_process():
@@ -30,13 +39,15 @@ def data_process():
     examples = []
     example = InputExample(guid=f'train-{data["idx"]}', text_a=data["premise"], text_b=data["hypothesis"], label=data["label"])
     
-    print(example.to_json_string())
+    # print(example.to_json_string())
+
+    # get_input_features
     # True:表示上下文，非模板中的提示词。False:表示模板中提示词。
     a_txt = [(example.text_a, True), ('Question:', False), (example.text_b, True), ("?", False), ("the", False), ("Answer:", False), ("[MASK]", False), (".", False)]
 
     a_token_ids= [(tokenizer.encode(x, add_special_tokens=False), s) for x, s in a_txt if x] # 如果 x 不是空串
 
-        
+
     tokens_a = [token_id for part, _ in a_token_ids for token_id in part]
     ...
 
