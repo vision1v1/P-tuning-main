@@ -1,0 +1,40 @@
+{
+    "configurations": [
+        {
+            "name": "PTuneForLAMA",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/LAMA/cli.py",
+            "args": [
+                "--model_name", "bert-base-cased"
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "PT-Fewshot",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/PT-Fewshot/cli.py",
+            "cwd": "${workspaceFolder}/PT-Fewshot",
+            "args": [
+                "--data_dir", "../FewGLUE_32dev/RTE",
+                "--model_type", "albert",
+                "--model_name", "${env:my_data_dir}/pretrained/albert/albert-xxlarge-v2",
+                "--task_name", "rte",
+                "--output_dir", "../out/PT-Fewshot/rte",
+                // "--do_eval",
+                "--do_train",
+                "--pet_per_gpu_eval_batch_size", "1",
+                "--pet_per_gpu_train_batch_size", "1",
+                "--pet_gradient_accumulation_steps", "2",
+                "--pet_max_seq_length", "16", //方便调试 原值 "256",
+                "--pet_max_steps", "100", // 方便调试 训练更新步少点
+                "--warmup_steps", "150",
+                "--pattern_ids", "1",
+                "--learning_rate", "1e-4",
+                "--no_cuda"
+            ],
+            "justMyCode": true
+        }
+    ]
+}
